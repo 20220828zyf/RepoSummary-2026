@@ -80,7 +80,7 @@ RepoSummary/
 
 ### 1. 克隆项目
 ```bash
-git clone <repository-url>
+git clone https://github.com/20220828zyf/RepoSummary-2026.git
 cd RepoSummary
 ```
 
