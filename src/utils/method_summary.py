@@ -142,7 +142,7 @@ def call_with_retry(fn, retries=5, base_delay=0.5, max_delay=8.0):
     return fn()
 
 def method_summary(output_dir: str, strategy: str) -> List[Function]:
-    method_df = pd.read_csv(os.path.join(output_dir, "method.csv"))
+    method_df = pd.read_csv(os.path.join(output_dir, "methods.csv"))
     functions = []
 
     for index, row in method_df.iterrows():
@@ -153,7 +153,7 @@ def method_summary(output_dir: str, strategy: str) -> List[Function]:
         func_file = parts[-2] if len(parts) >= 2 else parts[-1]
         
         function = Function(
-            func_id=row["ID"]-1,
+            func_id=row["ID"],
             func_name=function_name,
             func_desc="",
             func_file=func_file,
@@ -166,9 +166,32 @@ def method_summary(output_dir: str, strategy: str) -> List[Function]:
         functions.append(function)
 
     # 加载邻接矩阵
-    func_adj_matrix_df = pd.read_csv(os.path.join(output_dir, 'method_adj_matrix.csv'), header=None).to_numpy()
-    func_adj_matrix = func_adj_matrix_df[1:, 1:]
-    set_func_adj_matrix(func_adj_matrix)
+    # 读取 CSV 并转换为 numpy 数组，确保是整数类型
+    try:
+        func_adj_matrix_df = pd.read_csv(os.path.join(output_dir, 'method_adj_matrix.csv'), header=None)
+        # 转换为整数类型，处理可能的 NaN 或字符串
+        func_adj_matrix_df = func_adj_matrix_df.fillna(0).astype(int)
+        func_adj_matrix = func_adj_matrix_df.to_numpy()
+        
+        # 验证矩阵大小是否与函数数量匹配
+        expected_size = len(functions)
+        if func_adj_matrix.shape[0] != expected_size or func_adj_matrix.shape[1] != expected_size:
+            print(f"警告: 矩阵大小 ({func_adj_matrix.shape}) 与函数数量 ({expected_size}) 不匹配，将调整矩阵大小")
+            # 如果矩阵太大，截断；如果太小，用零填充
+            if func_adj_matrix.shape[0] > expected_size:
+                func_adj_matrix = func_adj_matrix[:expected_size, :expected_size]
+            elif func_adj_matrix.shape[0] < expected_size:
+                # 创建新的矩阵，用零填充
+                new_matrix = np.zeros((expected_size, expected_size), dtype=int)
+                new_matrix[:func_adj_matrix.shape[0], :func_adj_matrix.shape[1]] = func_adj_matrix
+                func_adj_matrix = new_matrix
+        
+        set_func_adj_matrix(func_adj_matrix)
+    except Exception as e:
+        print(f"警告: 加载 method_adj_matrix.csv 失败: {e}")
+        # 如果加载失败，创建一个空的零矩阵
+        func_adj_matrix = np.zeros((len(functions), len(functions)), dtype=int)
+        set_func_adj_matrix(func_adj_matrix)
 
     if strategy == "function_name":
         return function_name_summary(output_dir, functions)

@@ -165,7 +165,10 @@ def parse_usecase_payload(json_str: str) -> Dict[str, Any]:
 
 def generate_feature_description(feature_list: List[Feature], modelname: str):
     # 初始化特征描述
+
+
     for feature in feature_list:
+        
         feature.feature_desc = ""
 
     for feature in feature_list:

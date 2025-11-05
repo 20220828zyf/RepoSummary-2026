@@ -21,7 +21,7 @@ def merge_tiny_clusters(labels, W, min_size=2, min_accept_sim=0.0, penalize_larg
         uniq = np.unique(labels)
         for c in uniq:
             idx = np.where(labels == c)[0]
-            if idx.size >= min_size:
+            if idx.size >= min_size or idx.size == 0:
                 continue
             best_target, best_score = None, -1.0
             for d in np.unique(labels):
@@ -229,4 +229,5 @@ def safe_silhouette_from_similarity(W, labels, use_silhouette=False, sample_size
         return float(silhouette_score(dist, labels, metric="precomputed"))
     except Exception:
         return None
+
 

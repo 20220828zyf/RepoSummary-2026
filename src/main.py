@@ -5,14 +5,15 @@ from sentence_transformers import SentenceTransformer
 
 from structure_analsis.java.java_import_analyzer import JavaImportAnalyzer
 from structure_analsis.java.java_method_analyzer import JavaMethodAnalyzer
-from structure_analsis.python.python_analsis import PythonMethodAnalyzer
-
+from structure_analsis.python.ENRE_py.enre.__main__ import main as enre_main
 from model.models import Function, method_Cluster
 from utils.file_operations import create_directory_summary, add_functions_to_files
 from utils.file_clustering import find_best_resolution, save_to_file_cluster
 from utils.function_clustering import cluster_all_functions_to_features, set_func_adj_matrix
 from utils.feature_generation import generate_feature_description, merge_features_by_method_cluster, features_to_csv
 from utils.method_summary import method_summary
+
+
 
 def main(project_root: str, output_dir: str):
     # 可选择本地地址或者网页地址（github地址），这里使用本地地址
@@ -58,8 +59,8 @@ def main(project_root: str, output_dir: str):
         method_analyzer.analyze_project(project_root, output_dir)
     elif has_python:
         print("分析Python项目")
-        method_analyzer = PythonMethodAnalyzer()
-        method_analyzer.analyze_project(project_root, output_dir)
+        # 使用ENRE-py分析Python项目
+        enre_main([project_root, output_dir])
     else:
         print("未找到支持的代码文件（.java 或 .py）")
         return
