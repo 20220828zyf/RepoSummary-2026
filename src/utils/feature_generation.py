@@ -12,10 +12,27 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
-client = OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY"),
-    base_url=os.getenv("OPENAI_BASE_URL")
-)
+
+# 延迟初始化客户端，避免在导入时立即报错
+client = None
+
+def get_client():
+    """获取OpenAI客户端，如果未初始化则初始化"""
+    global client
+    if client is None:
+        api_key = os.getenv("OPENAI_API_KEY")
+        base_url = os.getenv("OPENAI_BASE_URL")
+        if not api_key:
+            raise ValueError(
+                "OPENAI_API_KEY 环境变量未设置。"
+                "请创建 .env 文件并设置 OPENAI_API_KEY 和 OPENAI_BASE_URL，"
+                "或者设置环境变量。"
+            )
+        client = OpenAI(
+            api_key=api_key,
+            base_url=base_url
+        )
+    return client
 
 userstory_prompt = """
 You are an engineer working on a software system and your goal is to reverse engineer User Storys from codes. You are given a list of ids and descriptions of the codes in the system below. 
@@ -178,7 +195,7 @@ def generate_feature_description(feature_list: List[Feature], modelname: str):
                 code += f"function name:{function.func_fullName}\ndescription:{function.func_desc}\nflow:{function.func_flow}\nNon-functional requirements:{function.func_notf}\n"
             prompt = userstory_prompt.format(code_content=code)
             try:
-                response = call_with_retry(lambda: client.chat.completions.create(
+                response = call_with_retry(lambda: get_client().chat.completions.create(
                     messages=[{"role": "user", "content": prompt}],
                     model=modelname,
                     response_format={"type": "json_object"},

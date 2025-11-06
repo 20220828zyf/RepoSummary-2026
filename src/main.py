@@ -66,10 +66,11 @@ def main(project_root: str, output_dir: str):
         return
 
     # 生成函数描述,可选择用函数名(function_name)/CodeT5(code_t5)/LLM(llm)生成
-    functions = method_summary(output_dir, strategy="function_name")
+    language = "python" if has_python else "java"
+    functions = method_summary(output_dir, strategy="code_t5", language=language)
     # 生成文件描述，在这里固定使用文件名
     files = create_directory_summary(project_root)
-    add_functions_to_files(files, functions)
+    add_functions_to_files(files, functions, language=language)
     # 可选择是否并行，在服务器上运行不确定是否可行，建议关闭
     is_parallel = False
 
@@ -139,13 +140,13 @@ def main(project_root: str, output_dir: str):
     
     modelname = "deepseek-v3"
     # 生成特征描述
-    generate_feature_description(feature_list, modelname=modelname)
+    #generate_feature_description(feature_list, modelname=modelname)
 
     # 合并特征
-    merge_features_by_method_cluster(feature_list, method_clusters, modelname=modelname)
+    #merge_features_by_method_cluster(feature_list, method_clusters, modelname=modelname)
 
     # 保存到CSV
-    features_to_csv(feature_list, method_clusters, os.path.join(output_dir, "features.csv"))
+    #features_to_csv(feature_list, method_clusters, os.path.join(output_dir, "features.csv"))
 
 if __name__ == "__main__":
     here = os.path.dirname(os.path.abspath(__file__))

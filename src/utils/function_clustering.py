@@ -5,6 +5,8 @@ from typing import List, Dict, Optional, Tuple, Any
 from dataclasses import dataclass
 from sklearn.metrics import adjusted_rand_score, silhouette_score
 from model.models import method_Cluster, Feature
+from utils.clustering_utils import merge_tiny_clusters
+
 
 # 全局变量，用于存储函数调用矩阵
 func_adj_matrix = None
@@ -450,6 +452,7 @@ def cluster_all_functions_to_features(
         )
         funcs = getattr(mc, "cluster_func_list", [])
         labels = res.best_labels
+        # 合并小簇
         labels = merge_tiny_clusters(labels, W, min_size=2, min_accept_sim=0.0, penalize_large=True, max_passes=5)
         
         # 组装 Feature

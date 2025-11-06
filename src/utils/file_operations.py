@@ -36,11 +36,18 @@ def create_directory_summary(root_path):
                 num += 1
     return Files_summary
 
-def add_functions_to_files(files: List[File], functions: List[Function]):
+def add_functions_to_files(files: List[File], functions: List[Function], language:str="python"):
     for function in functions:
-        class_name = function.func_file
-        for file in files:
-            if file.file_name == class_name:
-                file.func_list.append(function)
-                break
+        if language == "python":
+            # 检查文件代码中是否包含函数代码
+            for file in files:
+                if function.func_code in file.file_code:
+                    file.func_list.append(function)
+                    break
+        elif language == "java":
+            class_name = function.func_file
+            for file in files:
+                if file.file_name == class_name:
+                    file.func_list.append(function)
+                    break
 

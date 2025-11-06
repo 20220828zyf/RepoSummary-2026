@@ -1077,9 +1077,10 @@ class JavaMethodAnalyzer:
         
         with open(output_file, 'w', newline='', encoding='utf-8') as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(['Caller/Callee'] + [str(mid) for mid in method_ids])
+            #writer.writerow(['Caller/Callee'] + [str(mid) for mid in method_ids])
             for i, method_id in enumerate(method_ids):
-                row = [str(method_id)] + adj_matrix[i]
+                #row = [str(method_id)] + adj_matrix[i]
+                row = adj_matrix[i]
                 writer.writerow(row)
         print(f"方法调用邻接矩阵已写入: {output_file}")
 
