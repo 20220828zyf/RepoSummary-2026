@@ -117,7 +117,7 @@ def main(project_root: str, output_dir: str):
         method_clusters.append(method_cluster)
 
     for method_cluster in method_clusters:
-        print(f"Cluster ID: {method_cluster.cluster_id}, Functions: {[f.func_name for f in method_cluster.cluster_func_list]}")
+        print(f"Cluster ID: {method_cluster.cluster_id}, Functions: {[f.func_fullName for f in method_cluster.cluster_func_list]}")
 
     # 函数聚类
     feature_list, summary = cluster_all_functions_to_features(
@@ -136,21 +136,22 @@ def main(project_root: str, output_dir: str):
     )
     print(f"Total Features: {len(feature_list)}")
     for f in feature_list:
-        print(f"Feature ID {f.feature_id}: {f.cluster_id} {set(x.func_file for x in f.feature_func_list)}")
+        #print(f"Feature ID {f.feature_id}: {f.cluster_id} {set(x.func_file for x in f.feature_func_list)}")
+        print(f"Feature ID {f.feature_id}: {[function.func_fullName for function in f.feature_func_list]}")
     
     modelname = "deepseek-v3"
     # 生成特征描述
-    #generate_feature_description(feature_list, modelname=modelname)
+    generate_feature_description(feature_list, modelname=modelname)
 
     # 合并特征
-    #merge_features_by_method_cluster(feature_list, method_clusters, modelname=modelname)
+    merge_features_by_method_cluster(feature_list, method_clusters, modelname=modelname)
 
     # 保存到CSV
-    #features_to_csv(feature_list, method_clusters, os.path.join(output_dir, "features.csv"))
+    features_to_csv(feature_list, method_clusters, os.path.join(output_dir, "features.csv"))
 
 if __name__ == "__main__":
     here = os.path.dirname(os.path.abspath(__file__))
-    project_root = "E:/Projects\codemap-master\CtoR\RopoSummary\service\src\structure_analsis"
+    project_root = "E:/Projects/dataset/mrjob-master/mrjob"
     output_dir = os.path.join(here, "out")
     main(
         project_root=project_root,

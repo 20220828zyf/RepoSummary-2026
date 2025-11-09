@@ -91,6 +91,20 @@ def extract_comments_from_code(code: str, language: str="python") -> str:
     Returns:
         提取的注释文本，多个注释用换行符连接
     """
+    # 类型检查和转换：确保code是字符串类型
+    if code is None:
+        return ""
+    if not isinstance(code, str):
+        # 尝试转换为字符串
+        try:
+            code = str(code)
+        except Exception:
+            return ""
+    
+    # 如果转换后是空字符串或只包含空白字符
+    if not code or not code.strip():
+        return ""
+    
     comments = []
     
     if language == "python":
@@ -264,8 +278,31 @@ def code_t5_summary(functions: List[Function], language:str="python") -> List[Fu
         function.func_desc = extract_comments_from_code(function.func_code, language=language)
         if function.func_desc != "":
             continue
+        # 确保func_code是字符串类型
         text = function.func_code
-        input_ids = tokenizer(text, return_tensors="pt").input_ids
+        if not isinstance(text, str):
+            if text is None:
+                text = ""
+            else:
+                text = str(text)
+        if not text or not text.strip():
+            function.func_desc = function.func_name
+            continue
+        # 如果text超长则截断
+        # CodeT5模型的最大输入长度通常是512 tokens
+        max_length = 512
+        # 先检查原始文本长度（不添加special tokens，更准确）
+        temp_encoded = tokenizer(text, add_special_tokens=False)
+        original_length = len(temp_encoded['input_ids'])
+        
+        # 使用truncation参数自动截断超长文本
+        encoded = tokenizer(text, return_tensors="pt", truncation=True, max_length=max_length)
+        input_ids = encoded.input_ids
+        
+        # 如果原始文本被截断，给出警告
+        if original_length > max_length:
+            print(f"警告: 函数 {function.func_name} 的代码过长 ({original_length} tokens)，已截断至 {max_length} tokens")
+
         generated_ids = model.generate(input_ids, max_length=40)
         function.func_desc = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
     return functions
@@ -279,8 +316,14 @@ def method_summary(output_dir: str, strategy: str, language:str="python") -> Lis
         function_name = function_fullName.split("(")[0].split(".")[-1]
         # 提取类/模块名（可能是最后第二段或最后一段）
         parts = function_fullName.split("(")[0].split(".")
-        # 如果parts长度>=2，取倒数第二个；否则取最后一个
         func_file = parts[-2] if len(parts) >= 2 else parts[-1]
+        
+        # 确保method_code是字符串类型
+        method_code = row["method_code"]
+        if pd.isna(method_code):
+            method_code = ""
+        elif not isinstance(method_code, str):
+            method_code = str(method_code)
         
         function = Function(
             func_id=row["ID"],
@@ -289,7 +332,7 @@ def method_summary(output_dir: str, strategy: str, language:str="python") -> Lis
             func_file=func_file,
             func_flow="",
             func_notf="",
-            func_code=row["method_code"],
+            func_code=method_code,
             func_fullName=function_fullName,
             func_txt_vector=[]
         )
