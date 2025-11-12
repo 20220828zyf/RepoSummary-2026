@@ -1,8 +1,9 @@
 import os
+import sys
 import pandas as pd
 import numpy as np
 from sentence_transformers import SentenceTransformer
-
+import time
 from structure_analsis.java.java_import_analyzer import JavaImportAnalyzer
 from structure_analsis.java.java_method_analyzer import JavaMethodAnalyzer
 from structure_analsis.python.ENRE_py.enre.__main__ import main as enre_main
@@ -10,12 +11,49 @@ from model.models import Function, method_Cluster
 from utils.file_operations import create_directory_summary, add_functions_to_files
 from utils.file_clustering import find_best_resolution, save_to_file_cluster
 from utils.function_clustering import cluster_all_functions_to_features, set_func_adj_matrix
-from utils.feature_generation import generate_feature_description, merge_features_by_method_cluster, features_to_csv
+from utils.feature_generation import merge_features_by_method_cluster, features_to_csv, generate_feature_description_parallel, generate_feature_description
 from utils.method_summary import method_summary
+
+
+class TeeOutput:
+    """同时将输出写入文件和控制台的类"""
+    def __init__(self, file_path, mode='w', encoding='utf-8'):
+        self.file = open(file_path, mode, encoding=encoding)
+        self.stdout = sys.stdout
+        self.stderr = sys.stderr
+    
+    def write(self, text):
+        self.file.write(text)
+        self.file.flush()  # 确保立即写入文件
+        self.stdout.write(text)
+        self.stdout.flush()
+    
+    def flush(self):
+        self.file.flush()
+        self.stdout.flush()
+    
+    def close(self):
+        if self.file:
+            self.file.close()
+    
+    def isatty(self):
+        """返回False，表示这不是一个终端"""
+        return False
+    
+    def __enter__(self):
+        sys.stdout = self
+        sys.stderr = self
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout = self.stdout
+        sys.stderr = self.stderr
+        self.close()
 
 
 
 def main(project_root: str, output_dir: str):
+    start_time = time.time()
     # 可选择本地地址或者网页地址（github地址），这里使用本地地址
     if(project_root.startswith("http")):
         print("使用网页地址")
@@ -123,37 +161,51 @@ def main(project_root: str, output_dir: str):
     feature_list, summary = cluster_all_functions_to_features(
         method_clusters,
         weight_parameter=0.25,
-        gamma_min=0.05, gamma_max=0.5, n_points=24,
-        seeds_per_gamma=8,
-        use_knn=True, knn_k=20,
-        use_threshold=False, threshold_tau=0.0,
-        min_clusters=2, max_clusters_ratio=0.4,
-        use_silhouette=False, silhouette_sample_size=None,
-        objective="CPM",
-        consensus_tau=0.6, consensus_gamma=0.1,
-        rng_seed=2025,
-        target_total_features=None,
+        gamma_min=0.05, gamma_max=0.5, n_points=24, 
+        seeds_per_gamma=8, # 每个gamma
+        use_knn=True, knn_k=20, # 使用KNN稀疏化，指保留每个节点与其最近的k个节点的边
+        use_threshold=False, threshold_tau=0.0, # 使用阈值稀疏化，指保留边权重大于阈值的边
+        min_clusters=2, max_clusters_ratio=0.4, # 最小簇数和最大簇数比例
+        use_silhouette=False, silhouette_sample_size=None, # 使用轮廓系数评估簇的分离度
+        objective="CPM", # 目标函数，CPM表示聚类质量最大化
+        consensus_tau=0.6, consensus_gamma=0.1, # 共识算法参数
+        rng_seed=2025, # 随机种子
+        target_total_features=None, # 目标总特征数
     )
     print(f"Total Features: {len(feature_list)}")
     for f in feature_list:
-        #print(f"Feature ID {f.feature_id}: {f.cluster_id} {set(x.func_file for x in f.feature_func_list)}")
-        print(f"Feature ID {f.feature_id}: {[function.func_fullName for function in f.feature_func_list]}")
+        print(f"Feature ID {f.feature_id}: {f.cluster_id} {set(x.func_file for x in f.feature_func_list)}")
+        #print(f"Feature ID {f.feature_id}: {[function.func_fullName for function in f.feature_func_list]}")
     
     modelname = "deepseek-v3"
     # 生成特征描述
-    generate_feature_description(feature_list, modelname=modelname)
+    if is_parallel:
+        generate_feature_description_parallel(feature_list, modelname=modelname, max_workers=8)
+    else:
+        generate_feature_description(feature_list, modelname=modelname)
 
     # 合并特征
     merge_features_by_method_cluster(feature_list, method_clusters, modelname=modelname)
 
     # 保存到CSV
     features_to_csv(feature_list, method_clusters, os.path.join(output_dir, "features.csv"))
+    end_time = time.time()
+    print(f"Time taken: {end_time - start_time} seconds")
 
 if __name__ == "__main__":
     here = os.path.dirname(os.path.abspath(__file__))
     project_root = "E:/Projects/dataset/mrjob-master/mrjob"
     output_dir = os.path.join(here, "out")
-    main(
-        project_root=project_root,
-        output_dir=output_dir
-    )
+    
+    # 创建日志文件路径
+    log_file = os.path.join(output_dir, "output_log.txt")
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # 使用TeeOutput重定向所有输出到文件和控制台
+    with TeeOutput(log_file, mode='w', encoding='utf-8'):
+        main(
+            project_root=project_root,
+            output_dir=output_dir
+        ) 
+    
+    print(f"\n所有输出已保存到: {log_file}")

@@ -6,6 +6,7 @@ from typing import Any, Dict, List
 from openai import OpenAI
 from model.models import Feature, method_Cluster
 import pandas as pd
+import concurrent.futures
 
 # 从环境变量加载API配置
 import os
@@ -180,19 +181,51 @@ def parse_usecase_payload(json_str: str) -> Dict[str, Any]:
 
     return data
 
+def process_feature(feature, modelname):
+    while feature.feature_desc == "":
+        code = ""
+        for function in feature.feature_func_list:
+            code += (
+                "function name:" + str(function.func_fullName) + "\n"
+                "function code:" + str(function.func_code) + "\n"
+            )
+        prompt = userstory_prompt.format(code_content=code)
+        try:
+            response = call_with_retry(lambda: get_client().chat.completions.create(
+                messages=[{"role": "user", "content": prompt}],
+                model=modelname,
+                response_format={"type": "json_object"},
+                temperature=0.3,
+                top_p=0.95,
+                frequency_penalty=0.5,
+                presence_penalty=0.2
+            ))
+            json_str = response.choices[0].message.content or ""
+            data = parse_usecase_payload(json_str)
+            result = usecase.model_validate(data)
+            feature.feature_desc = result.description
+            feature.feature_flow = result.flow
+            feature.feature_notf = result.notf
+        except Exception as e:
+            print(f"Feature ID: {feature.feature_id} 错误: {e}")
+    print(f"Feature ID: {feature.feature_id}, Description: {feature.feature_desc}")
+
+def generate_feature_description_parallel(feature_list, modelname:str, max_workers=8):
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(process_feature, feature, modelname) for feature in feature_list]
+        concurrent.futures.wait(futures)
+
 def generate_feature_description(feature_list: List[Feature], modelname: str):
     # 初始化特征描述
-
-
     for feature in feature_list:
-        
         feature.feature_desc = ""
 
     for feature in feature_list:
         while feature.feature_desc == "":
             code = ""
             for function in feature.feature_func_list:
-                code += f"function name:{function.func_fullName}\ndescription:{function.func_desc}\nflow:{function.func_flow}\nNon-functional requirements:{function.func_notf}\n"
+                # 使用代码原文生成feature
+                code += f"function name:{function.func_fullName}\nfunction code:{function.func_code}\n"
             prompt = userstory_prompt.format(code_content=code)
             try:
                 response = call_with_retry(lambda: get_client().chat.completions.create(
@@ -216,7 +249,7 @@ def generate_feature_description(feature_list: List[Feature], modelname: str):
                 print(f"Pydantic验证失败: {e}\nRaw: {json_str}\nParsed: {data}")
             except Exception as e:
                 print(f"其他错误: {e}")
-            print(f"Feature ID: {feature.feature_id}, Description: {feature.feature_desc}, Flow: {feature.feature_flow}, Non-functional requirements: {feature.feature_notf}")
+            print(f"Feature ID: {feature.feature_id}, Description: {feature.feature_desc}")
 
 def merge_features_by_method_cluster(features: List[Feature], method_clusters: List[method_Cluster], modelname: str):
     merged_features_des = []
@@ -233,7 +266,7 @@ def merge_features_by_method_cluster(features: List[Feature], method_clusters: L
             module_list=module_list
         )
         try:
-            response = call_with_retry(lambda: client.chat.completions.create(
+            response = call_with_retry(lambda: get_client().chat.completions.create(
                 messages=[{"role": "user", "content": prompt}],
                 model=modelname,
                 response_format={"type": "json_object"},
@@ -256,7 +289,7 @@ def merge_features_by_method_cluster(features: List[Feature], method_clusters: L
             print(f"Pydantic验证失败: {e}")
         except Exception as e:
             print(f"其他错误: {e}")
-        print(f"Module ID: {method_cluster.cluster_id}, Description: {method_cluster.cluster_desc}")
+        print(f"Module ID: {method_cluster.cluster_id}, Description: {method_cluster.cluster_desc}\n")
 
 def features_to_csv(features: List[Feature], method_clusters: List[method_Cluster], filename: str):
     rows = []

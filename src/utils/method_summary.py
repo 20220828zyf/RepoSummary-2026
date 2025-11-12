@@ -267,7 +267,11 @@ def call_with_retry(fn, retries=5, base_delay=0.5, max_delay=8.0):
 
 def function_name_summary(functions: List[Function]) -> List[Function]:
     for function in functions:
-        function.func_desc = function.func_fullName
+        # 不应该使用函数全名，应该使用文件名+函数名+参数名
+        params = '('+function.func_fullName.split("(")[-1]
+        method_name = function.func_fullName.split("(")[0].split(".")[-1]
+        file_name = function.func_fullName.split("(")[0].split(".")[-2]
+        function.func_desc = f"{file_name}.{method_name}{params}"
     return functions
 
 def code_t5_summary(functions: List[Function], language:str="python") -> List[Function]:
@@ -376,12 +380,17 @@ def method_summary(output_dir: str, strategy: str, language:str="python") -> Lis
                 continue
             else:
                 function.func_desc = function.func_name
-
+    
     if strategy == "function_name":
-        return function_name_summary(functions)
+        functions = function_name_summary(functions)
     elif strategy == "code_t5":
-        return code_t5_summary(functions, language=language)
+        functions = code_t5_summary(functions, language=language)
     elif strategy == "llm":
-        return generate_function_descriptions(functions, modelname=modelname, method_adj_matrix=method_adj_matrix, language=language)
+        functions = generate_function_descriptions(functions, modelname=modelname, method_adj_matrix=method_adj_matrix, language=language)
     else:
         raise ValueError(f"Invalid strategy: {strategy}")
+
+    # 将functions保存到CSV
+    functions_df = pd.DataFrame([function.__dict__ for function in functions])
+    functions_df.to_csv(os.path.join(output_dir, "methods_with_desc.csv"), index=False)
+    return functions
